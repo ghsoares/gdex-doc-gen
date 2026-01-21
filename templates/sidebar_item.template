@@ -1,6 +1,6 @@
 <li>
 	<p class="sidebar-caption {{item-classes}}" style="padding-left: calc(.809em * {{depth}})">
-		<a href="{{href}}">{{name}}</a>
+		{{content}}
 	</p>
 	<ul>{{items}}</ul>
 </li>

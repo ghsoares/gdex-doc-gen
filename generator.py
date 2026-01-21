@@ -223,8 +223,16 @@ def generate_sidebar_items(gen, items, depth = 1):
 		item_generated = gen.get_template("sidebar_item")
 
 		item_generated = item_generated.replace("{{depth}}", str(depth))
-		item_generated = item_generated.replace("{{href}}", str(item['href']))
-		item_generated = item_generated.replace("{{name}}", str(item['name']))
+		if 'href' in item:
+			item_generated = item_generated.replace(
+				"{{content}}", 
+				f"""<a href="{item['href']}">{item['name']}</a>"""
+			)
+		else:
+			item_generated = item_generated.replace(
+				"{{content}}", 
+				f"""{item['name']}"""
+			)
 
 		item_class = ""
 
@@ -367,9 +375,11 @@ gen.add_page({
 })
 
 sidebar_class_referece = {
-	"href": "$BASE_URL/classes/",
 	"name": "CLASS REFERENCE",
-	"items": []
+	"items": [{
+		"href": "$BASE_URL/classes/",
+		"name": "All Classes"
+	}]
 }
 for class_info in gen.classes:
 	location = class_info["location"]
