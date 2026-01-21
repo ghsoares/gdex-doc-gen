@@ -1,0 +1,10 @@
+<tr class="method-ref {{odd_even_row}}">
+	<td>
+		<p>{{return_type}}</p>
+	</td>
+	<td>
+		<p>
+			<a href="#method-{{method_name}}">{{method_name}}</a>({{method_params}})
+		</p>
+	</td>
+</tr>

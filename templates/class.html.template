@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{class_name}} - {{project_title}}</title>
+	{{default_header}}
+</head>
+
+<body>
+	{{sidebar}}
+	<div>
+		{{doc_header}}
+		<h1>{{class_name}}</h1>
+		<p>{{brief_description}}</p>
+		<section id="description">
+			<h2>Description</h2>
+			<p>{{description}}</p>
+		</section>
+		<section id="methods">
+			<h2>Methods</h2>
+			<table id="class-method-table">
+				<tbody>
+					{{method_reference_items}}
+				</tbody>
+			</table>
+		</section>
+		<section id="method-descriptions">
+			<h2>Method Descriptions</h2>
+			{{method_description_items}}
+		</section>
+	</div>
+	<script src="/resources/scripts/documentation.js"></script>
+</body>
+
+</html>

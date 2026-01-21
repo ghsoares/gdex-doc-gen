@@ -1,0 +1,5 @@
+<nav id="navigation">
+	<h3>{{project_title}}</h3>
+	<ul>{{navigation_items}}</ul>
+</nav>
+<hr>
