@@ -1,5 +1,5 @@
 <aside id="sidebar">
-	<a href="/index.html" id="sidebar-header">
+	<a href="$BASE_URL/index.html" id="sidebar-header">
 		<h2>{{project_title}}</h2>
 	</a>
 	<ul id="sidebar-content">

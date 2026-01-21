@@ -23,7 +23,7 @@ gen.args = arguments_parser.parse_args()
 gen.project_name = gen.args.project_name
 
 # Get absolute paths
-gen.base_url = os.getenv('PROJECT_BASE_URL', '')
+gen.base_url = os.getenv('PROJECT_BASE_URL', '').rstrip('/')
 gen.src_folder = os.path.abspath(gen.args.src_folder)
 gen.dst_folder = os.path.abspath(gen.args.dst_folder)
 gen.dist_folder = os.path.join(gen.dst_folder, 'dist')
@@ -359,14 +359,14 @@ gen.call_custom_function("configure_classes")
 
 gen.add_page({
 	"name": "All classes",
-	"href": "./classes/index.html",
+	"href": "$BASE_URL/classes/index.html",
 	"location": "/classes",
 	"filename": gen.dist_path('classes/index.html'),
 	"content": gen.get_template('all_classes.html')
 })
 
 sidebar_class_referece = {
-	"href": "./classes/index.html",
+	"href": "$BASE_URL/classes/index.html",
 	"name": "CLASS REFERENCE",
 	"items": []
 }
