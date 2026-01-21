@@ -2,7 +2,7 @@
 
 # This script generates a static HTML page from .xml GDExtension documentation files
 # Usage:
-# generator "Project Name" ../doc_classes ../docs/
+# generator -project_name "Project Name" -src_folder ../doc_classes -dst_folder ../docs/
 
 import argparse
 import glob
@@ -13,9 +13,9 @@ import sys
 class Generator: pass
 
 arguments_parser = argparse.ArgumentParser("generator")
-arguments_parser.add_argument("project_name", help="The name of the project", type=str)
-arguments_parser.add_argument("src_folder", help="The source folder which contains .xml class files", type=str)
-arguments_parser.add_argument("dst_folder", help="The destiny folder which will contain the generated static site on dist/", type=str)
+arguments_parser.add_argument("-project_name", help="The name of the project", type=str)
+arguments_parser.add_argument("-src_folder", help="The source folder which contains .xml class files", type=str)
+arguments_parser.add_argument("-dst_folder", help="The destiny folder which will contain the generated static site on dist/", type=str)
 
 gen = Generator()
 gen.args = arguments_parser.parse_args()
@@ -23,6 +23,7 @@ gen.args = arguments_parser.parse_args()
 gen.project_name = gen.args.project_name
 
 # Get absolute paths
+gen.base_url = os.getenv('PROJECT_BASE_URL', '')
 gen.src_folder = os.path.abspath(gen.args.src_folder)
 gen.dst_folder = os.path.abspath(gen.args.dst_folder)
 gen.dist_folder = os.path.join(gen.dst_folder, 'dist')
@@ -39,6 +40,9 @@ gen.sidebar = []
 def ensure_dir(gen, path):
 	if not os.path.exists(path):
 		os.makedirs(path)
+
+def dist_path(gen, path):
+	return os.path.join(gen.dist_folder, path)
 
 def get_html_template(gen, path):
 	with open(path, 'r') as f:
@@ -96,11 +100,12 @@ def get_class_info_from_xml(gen, xml_path):
 	return {
 		"name": name,
 		"location": f"/classes/class_{name.lower()}",
+		"href": f"$BASE_URL/classes/class_{name.lower()}.html",
 		"inherits": inherits,
 		"brief_description": brief_description,
 		"description": description,
 		"methods": methods,
-		"html_file": os.path.join(gen.dist_folder, f"classes/{name}.html")
+		"filename": gen.dist_path(f"classes/class_{name.lower()}.html")
 	}
 
 def add_class_information(gen, xml_path):
@@ -125,7 +130,7 @@ def markup_type(gen, text):
 	if text == "void":
 		return "<abbr title=\"No return value.\">void</abbr>"
 	if text in gen.class_index:
-		return f"<a href=\"/classes/{text}.html\"><span>{text}</span></a>"
+		return f"<a href=\"$BASE_URL/classes/{text}.html\"><span>{text}</span></a>"
 	
 	if text.startswith("Array["):
 		actual_text = text[len("Array["):text.find("]")]
@@ -249,7 +254,7 @@ def generate_doc_header(gen, current_location):
 
 	items = []
 
-	items.append("""<li><a href="/index.html" class="material-symbols-outlined" aria-label="Home">home</a></li>""")
+	items.append("""<li><a href="$BASE_URL/index.html" class="material-symbols-outlined" aria-label="Home">home</a></li>""")
 
 	current_location = current_location.split("/")[1:]
 
@@ -289,10 +294,12 @@ def make_page(gen, page):
 	page['content'] = page['content'].replace("{{default_header}}", gen.get_template("default_header"))
 	page['content'] = page['content'].replace("{{default_footer}}", gen.get_template("default_footer"))
 
+	page['content'] = page['content'].replace("$BASE_URL", gen.base_url)
+
 	soup = bs4.BeautifulSoup(page['content'], features="html.parser")
 	final_content = soup.prettify()
 
-	filename = os.path.join(gen.dist_folder, page['href'][1:])
+	filename = os.path.join(gen.dist_folder, page['filename'])
 	folder = os.path.dirname(filename)
 	gen.ensure_dir(folder)
 	with open(filename, 'w+') as f:
@@ -304,6 +311,7 @@ def call_custom_function(gen, function_name):
 		getattr(gen.custom_module, function_name)(gen)
 
 gen.__class__.ensure_dir = ensure_dir
+gen.__class__.dist_path = dist_path
 gen.__class__.get_html_template = get_html_template
 gen.__class__.add_html_template = add_html_template
 gen.__class__.add_all_html_templates = add_all_html_templates
@@ -351,23 +359,25 @@ gen.call_custom_function("configure_classes")
 
 gen.add_page({
 	"name": "All classes",
-	"href": "/classes/index.html",
+	"href": "./classes/index.html",
 	"location": "/classes",
+	"filename": gen.dist_path('classes/index.html'),
 	"content": gen.get_template('all_classes.html')
 })
 
 sidebar_class_referece = {
-	"href": "/classes/index.html",
+	"href": "./classes/index.html",
 	"name": "CLASS REFERENCE",
 	"items": []
 }
 for class_info in gen.classes:
 	location = class_info["location"]
-	href = f"{location}.html"
+	href = class_info["href"]
 	gen.add_page({
 		"name": class_info["name"],
 		"href": href,
 		"location": location,
+		"filename": class_info["filename"],
 		"content": gen.generate_class_html(class_info)
 	})
 	sidebar_class_items = [{
