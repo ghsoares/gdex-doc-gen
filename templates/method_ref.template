@@ -4,7 +4,7 @@
 	</td>
 	<td>
 		<p>
-			<a href="#method-{{method_name}}">{{method_name}}</a>({{method_params}})
+			<a href="#method-{{method_name}}">{{method_name}}</a>({{method_params}})&nbsp;{{method_qualifiers}}
 		</p>
 	</td>
 </tr>

@@ -8,3 +8,79 @@ code.literal {
 	padding: 3px 5px;
 }
 
+.codeblocks > .codeblocks-tabs {
+	display: flex;
+	flex-direction: row;
+}
+
+.codeblocks > .codeblocks-tabs > button {
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+
+	background-color: var(--code-tabs-background-color);
+    border-top: 4px solid var(--code-tabs-selected-color);
+	color: var(--link-color);
+    padding: 0.5rem 1.25rem;
+
+	cursor: pointer;
+}
+
+.codeblocks > .language {
+	display: none;
+
+	padding: 0.4rem;
+	position: relative;
+
+	background-color: var(--code-tabs-background-color);
+}
+
+.codeblocks > .language.active {
+	display: block;
+}
+
+.codeblocks > .language > .filename {
+	background-color: var(--code-tabs-background-color);
+	position: absolute;
+	right: 16px;
+	top: 16px;
+	cursor: pointer;
+	color: var(--link-color);
+	border-radius: 2px;
+
+	padding: 3px 5px;
+	border: 0;
+
+	font-family: var(--monospace-font-family);
+	font-weight: 700;
+
+	opacity: 50%;
+}
+
+.codeblocks > .language > .filename:hover {
+	background-color: var(--code-tabs-background-color);
+	position: absolute;
+	right: 16px;
+	top: 16px;
+	cursor: pointer;
+	color: var(--link-color);
+	border-radius: 2px;
+
+	padding: 3px 5px;
+
+	opacity: 100%;
+}
+
+.codeblocks > .language > pre {
+	-moz-tab-size:    4;
+    -o-tab-size:      4;
+    tab-size:         4;
+
+	background-color: var(--highlight-background-color);
+	padding: 18px 16px;
+	margin: 0;
+}
+
+.codeblocks .language > pre > code {
+	background: none;
+}

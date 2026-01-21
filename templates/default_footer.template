@@ -1,1 +1,9 @@
+<footer>
+	<hr>
+	<p>
+		{{copyright_info}}
+		{{build_info}}
+	</p>
+</footer>
+<script src="$BASE_URL/resources/scripts/code.js"></script>
 <script src="$BASE_URL/resources/scripts/documentation.js"></script>

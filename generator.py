@@ -36,29 +36,48 @@ gen.class_index = {}
 gen.pages = []
 gen.page_index = {}
 gen.sidebar = []
+gen.icon_list = []
+gen.copyright_info = ""
+gen.build_info = """<p>Built with <a href="https://github.com/ghsoares/gdex-doc-gen">GDExDocGen</a>.</p>"""
 
 def ensure_dir(gen, path):
 	if not os.path.exists(path):
 		os.makedirs(path)
 
+def dst_path(gen, path):
+	return os.path.join(gen.dst_folder, path)
+
 def dist_path(gen, path):
 	return os.path.join(gen.dist_folder, path)
 
-def get_html_template(gen, path):
+def set_copyright_info(gen, info):
+	gen.copyright_info = info
+
+def set_build_info(gen, info):
+	gen.build_info = info
+
+def add_icon_declaration(gen, icon_name):
+	if isinstance(icon_name, list):
+		gen.icon_list += icon_name
+	else:
+		gen.icon_list.append(icon_name)
+	gen.icon_list.sort()
+
+def get_file_str(gen, path):
 	with open(path, 'r') as f:
 		template_content = f.read()
 
 	return template_content
 
-def add_html_template(gen, path):
-	basename = os.path.basename(path)
-	name, extension = os.path.splitext(basename)
-	gen.templates[name] = gen.get_html_template(path)
+def add_html_template_from_path(gen, name, path):
+	gen.templates[name] = gen.get_file_str(path)
 
-def add_all_html_templates(gen, folder):
+def add_all_html_templates_from_path(gen, folder):
 	html_files = glob.glob(os.path.join(folder, '*.template'))
 	for p in html_files:
-		gen.add_html_template(p)
+		basename = os.path.basename(p)
+		name, extension = os.path.splitext(basename)
+		gen.add_html_template_from_path(name, p)
 
 def get_template(gen, template_name):
 	return gen.templates[template_name]
@@ -68,8 +87,8 @@ def get_class_info_from_xml(gen, xml_path):
 	tree = ET.parse(xml_path)
 	root = tree.getroot()
 
-	name = root.attrib['name']
-	inherits = root.attrib['inherits']
+	name = root.get('name')
+	inherits = root.get('inherits')
 
 	brief_description = root.find('brief_description').text.strip()
 	description = root.find('description').text.strip()
@@ -77,14 +96,15 @@ def get_class_info_from_xml(gen, xml_path):
 	methods = []
 	methods_root = root.find('methods')
 	for method_node in methods_root.findall('method'):
-		method_name = method_node.attrib['name']
-		method_return = method_node.find('return').attrib['type']
+		method_name = method_node.get('name')
+		method_return = method_node.find('return').get('type')
+		method_qualifiers = method_node.get('qualifiers') or ''
 		method_description = method_node.find('description').text.strip()
 		method_params = []
 
 		for param in method_node.findall('param'):
-			param_name = param.attrib['name']
-			param_type = param.attrib['type']
+			param_name = param.get('name')
+			param_type = param.get('type')
 			method_params.append({
 				"name": param_name,
 				"type": param_type
@@ -94,6 +114,7 @@ def get_class_info_from_xml(gen, xml_path):
 			"name": method_name,
 			"return": method_return,
 			"params": method_params,
+			"qualifiers": method_qualifiers.split(" "),
 			"description": method_description
 		})
 	
@@ -123,6 +144,13 @@ def add_page(gen, page_info):
 	gen.pages.append(page_info)
 	gen.page_index[page_info['location']] = page_info
 
+def add_documentation_page(gen, page):
+	content = gen.get_template('generic.html')
+	content = content.replace("{{page_content}}", page['content'])
+	page = page.copy()
+	page['content'] = content
+	gen.add_page(page)
+
 def add_sidebar_item(gen, item):
 	gen.sidebar.append(item)
 
@@ -130,23 +158,95 @@ def markup_type(gen, text):
 	if text == "void":
 		return "<abbr title=\"No return value.\">void</abbr>"
 	if text in gen.class_index:
-		return f"<a href=\"$BASE_URL/classes/{text}.html\"><span>{text}</span></a>"
+		return f"<a href=\"$BASE_URL/classes/class_{text}.html\">{text}</a>"
 	
 	if text.startswith("Array["):
 		actual_text = text[len("Array["):text.find("]")]
 		return gen.markup_type("Array") + "[" + gen.markup_type(actual_text) + "]"
  
 	class_url = os.path.join(gen.godot_docs_url, f"classes/class_{text.lower()}.html")
-	return f"<a href=\"{class_url}\"><span>{text}</span></a>"
+	return f"<a href=\"{class_url}\">{text}</a>"
 
-def markup_text(gen, text):
+def markup_codeblocks(gen, text):
 	import re
 
-	generated = text.split("\n")
+	generated = text
+
+	languages = []
+
+	first = True
+	while True:
+		m = re.search(r"""\[(\w+?)=(.+?)\]|\[(\w+?)\]""", generated)
+		if not m: break
+
+		language = m.group(1) or m.group(3)
+		filename = m.group(2)
+
+		code_start = m.span()
+
+		m = re.search(f"""\\[/{language}\\]""", generated[code_start[1]:])
+		if not m: 
+			raise Exception(f"Couldn't find closing tag [/{language}]")
+		
+		code_end = m.span()
+		code_end = (code_end[0] + code_start[1], code_end[1] + code_start[1])
+
+		code = generated[code_start[1]:code_end[0]].strip()
+		code = code.replace("<", "&lt;")
+		code = code.replace(">", "&gt;")
+
+		filename_el = f"""<button title="Click to copy the code" class="filename">{filename}</button>""" if filename else ""
+		active_class = "active" if first else ""
+
+		code = f"""<div class="language {language} {active_class}">{filename_el}<pre><code>{code}</code></pre></div>"""
+
+		generated = generated[:code_start[0]] + code + generated[code_end[1]:]
+		first = False
+
+		languages.append(language)
+
+	return {
+		"languages": languages,
+		"text": generated
+	}
+
+def markup_bbcode(gen, text):
+	import re
+
+	generated = text
+
+	# Match codeblocks
+	generated_codeblocks = {}
+	while True:
+		block0 = re.search(r"\[codeblocks\]", generated)
+		if not block0: break
+		block0 = block0.span()
+
+		block1 = re.search(r"\[/codeblocks\]", generated[block0[1]:])
+		if not block1: break
+		block1 = block1.span()
+		block1 = (block1[0] + block0[1], block1[1] + block0[1])
+
+		block = gen.markup_codeblocks(generated[block0[1]:block1[0]])
+		block_id = f"codeblock-{len(generated_codeblocks)}"
+
+		block_tabs = []
+		for lang in block['languages']:
+			block_tabs.append(f"""<button class="{lang}">{lang}</button>""")
+			pass
+
+		block_text = f"""<div class="codeblocks"><div class="codeblocks-tabs">{''.join(block_tabs)}</div>{block['text']}</div>"""
+
+		generated = generated[:block0[0]] + "{{" + block_id + "}}" + generated[block1[1]:]
+		generated_codeblocks[block_id] = block_text
+
+	# Generate paragraphs
+	generated = re.split(r"\n+", generated)
 	for i in range(len(generated)):
 		generated[i] = "<p>" + generated[i].strip() + "</p>"
 	generated = "".join(generated)
 
+	# Basic formatting tabs
 	generated = re.sub(r"\[b\]", "<b>", generated)
 	generated = re.sub(r"\[/b\]", "</b>", generated)
 	generated = re.sub(r"\[i\]", "<i>", generated)
@@ -157,10 +257,27 @@ def markup_text(gen, text):
 	generated = re.sub(r"\[/s\]", "</s>", generated)
 	generated = re.sub(r"\[kbd\]", "<kbd>", generated)
 	generated = re.sub(r"\[/kbd\]", "</kbd>", generated)
-	generated = re.sub(r"\[url\](.+?)\[/url\]", r"""<a href="\1">\1</a>""", generated)
-	generated = re.sub(r"\[url=(.+?)\](.+?)\[/url\]", r"""<a href="\1">\2</a>""", generated)
+
+	# Section
+	generated = re.sub(r"\[section=(.+?)\]", r"""<section id="\1">""", generated)
+	generated = re.sub(r"\[/section\]", r"""</section>""", generated)
+	generated = re.sub(r"\[section_title(\d)\](.+?)\[/section_title\d\]", r"""<h\1 link-section>\2</h1>""", generated)
+
+	# Url link same as text
+	generated = re.sub(r"\[url\](.+?)\[/url\]", r"""<a class="external-link" href="\1">\1</a>""", generated)
+
+	# Url link with custom text
+	generated = re.sub(r"\[url=(.+?)\](.+?)\[/url\]", r"""<a class="external-link" href="\1">\2</a>""", generated)
+
+	# Image
+	generated = re.sub(r"\[img\](.+?)\[/img\]", r"""<img src="\1"></img>""", generated)
+
+	# Image with width
+	generated = re.sub(r"\[img=(.+?)\](.+?)\[/img\]", r"""<img width="\1" src="\2"></img>""", generated)
+
+	# Simple code formatting
 	generated = re.sub(r"\[code\](.+?)\[/code\]", r"""<code class="literal notranslate">\1</code>""", generated)
-	generated = re.sub(r"\[param (.+?)\]\[/param\]", r"""<code class="literal notranslate">\1</code>""", generated)
+	generated = re.sub(r"\[param (.+?)\]", r"""<code class="literal notranslate">\1</code>""", generated)
 
 	generated = re.sub(
 		r"\[class (.+?)\]", 
@@ -168,22 +285,46 @@ def markup_text(gen, text):
 		generated
 	)
 
+	# Insert codeblocks back
+	for codeblock_id in generated_codeblocks.keys():
+		generated = generated.replace("{{" + codeblock_id + "}}", generated_codeblocks[codeblock_id])
+
 	return generated
+
+def markup_qualifier(gen, qualifier):
+	match qualifier:
+		case "const":
+			return """<abbr title="This method has no side effects. It doesn't modify any of the instance's member variables.">const</abbr>"""
+		case "virtual":
+			return """<abbr title="This method should typically be overridden by the user to have any effect.">virtual</abbr>"""
+		case "static":
+			return """<abbr title="This method doesn't need an instance to be called, so it can be called directly using the class name.">static</abbr>"""
+		case "vararg":
+			return """<abbr title="This method accepts any number of arguments after the ones described here.">vararg</abbr>"""
+		case "required":
+			return """<abbr title="This method is required to be overridden when extending its base class.">required</abbr>"""
+	return qualifier
 
 def generate_method_params(gen, params):
 	generated = []
 	for i in range(len(params)):
 		param = params[i]
-		generated.append(f"{param['name']}: {gen.markup_type(param['type'])}")
+		generated.append(f"{param['name']}:&nbsp;{gen.markup_type(param['type'])}")
 	return ", ".join(generated)
+
+def generate_method_qualifiers(gen, qualifiers):
+	generated = []
+	for i in range(len(qualifiers)):
+		generated.append(gen.markup_qualifier(qualifiers[i]))
+	return " ".join(generated)
 
 def generate_class_html(gen, class_info):
 	name = class_info['name']
 
 	generated = gen.get_template('class.html')
 	generated = generated.replace("{{class_name}}", name)
-	generated = generated.replace("{{brief_description}}", gen.markup_text(class_info['brief_description']))
-	generated = generated.replace("{{description}}", gen.markup_text(class_info['description']))
+	generated = generated.replace("{{brief_description}}", gen.markup_bbcode(class_info['brief_description']))
+	generated = generated.replace("{{description}}", gen.markup_bbcode(class_info['description']))
 
 	method_reference_items = []
 
@@ -195,6 +336,7 @@ def generate_class_html(gen, class_info):
 		method_item = method_item.replace("{{return_type}}", gen.markup_type(method['return']))
 		method_item = method_item.replace("{{method_name}}", method['name'])
 		method_item = method_item.replace("{{method_params}}", gen.generate_method_params(method['params']))
+		method_item = method_item.replace("{{method_qualifiers}}", gen.generate_method_qualifiers(method['qualifiers']))
 
 		method_reference_items.append(method_item)
 
@@ -207,9 +349,12 @@ def generate_class_html(gen, class_info):
 		method_item = method_item.replace("{{return_type}}", gen.markup_type(method['return']))
 		method_item = method_item.replace("{{method_name}}", method['name'])
 		method_item = method_item.replace("{{method_params}}", gen.generate_method_params(method['params']))
-		method_item = method_item.replace("{{method_description}}", gen.markup_text(method['description']))
+		method_item = method_item.replace("{{method_description}}", gen.markup_bbcode(method['description']))
+		method_item = method_item.replace("{{method_qualifiers}}", gen.generate_method_qualifiers(method['qualifiers']))
 
 		method_description_items.append(method_item)
+		if i < len(methods) - 1:
+			method_description_items.append("<hr>")
 
 	generated = generated.replace("{{method_description_items}}", "".join(method_description_items))
 
@@ -294,8 +439,6 @@ def copy_folder(gen, src, dst, dirs_exist_ok=True):
 	)
 
 def make_page(gen, page):
-	import bs4
-
 	page['content'] = page['content'].replace("{{sidebar}}", gen.generate_sidebar())
 	page['content'] = page['content'].replace("{{doc_header}}", gen.generate_doc_header(page['location']))
 
@@ -303,16 +446,18 @@ def make_page(gen, page):
 	page['content'] = page['content'].replace("{{default_header}}", gen.get_template("default_header"))
 	page['content'] = page['content'].replace("{{default_footer}}", gen.get_template("default_footer"))
 
-	page['content'] = page['content'].replace("$BASE_URL", gen.base_url)
+	page['content'] = page['content'].replace("{{icon_list}}", ",".join(gen.icon_list))
 
-	soup = bs4.BeautifulSoup(page['content'], features="html.parser")
-	final_content = soup.prettify()
+	page['content'] = page['content'].replace("{{copyright_info}}", gen.copyright_info)
+	page['content'] = page['content'].replace("{{build_info}}", gen.build_info)
+
+	page['content'] = page['content'].replace("$BASE_URL", gen.base_url)
 
 	filename = os.path.join(gen.dist_folder, page['filename'])
 	folder = os.path.dirname(filename)
 	gen.ensure_dir(folder)
 	with open(filename, 'w+') as f:
-		f.write(final_content)
+		f.write(page['content'])
 
 def call_custom_function(gen, function_name):
 	if not gen.custom_module: return
@@ -320,19 +465,27 @@ def call_custom_function(gen, function_name):
 		getattr(gen.custom_module, function_name)(gen)
 
 gen.__class__.ensure_dir = ensure_dir
+gen.__class__.dst_path = dst_path
 gen.__class__.dist_path = dist_path
-gen.__class__.get_html_template = get_html_template
-gen.__class__.add_html_template = add_html_template
-gen.__class__.add_all_html_templates = add_all_html_templates
+gen.__class__.set_copyright_info = set_copyright_info
+gen.__class__.set_build_info = set_build_info
+gen.__class__.add_icon_declaration = add_icon_declaration
+gen.__class__.get_file_str = get_file_str
+gen.__class__.add_html_template_from_path = add_html_template_from_path
+gen.__class__.add_all_html_templates_from_path = add_all_html_templates_from_path
 gen.__class__.get_template = get_template
 gen.__class__.get_class_info_from_xml = get_class_info_from_xml
 gen.__class__.add_class_information = add_class_information
 gen.__class__.add_all_class_informations = add_all_class_informations
 gen.__class__.add_page = add_page
+gen.__class__.add_documentation_page = add_documentation_page
 gen.__class__.add_sidebar_item = add_sidebar_item
 gen.__class__.markup_type = markup_type
-gen.__class__.markup_text = markup_text
+gen.__class__.markup_codeblocks = markup_codeblocks
+gen.__class__.markup_bbcode = markup_bbcode
+gen.__class__.markup_qualifier = markup_qualifier
 gen.__class__.generate_method_params = generate_method_params
+gen.__class__.generate_method_qualifiers = generate_method_qualifiers
 gen.__class__.generate_class_html = generate_class_html
 gen.__class__.generate_sidebar_items = generate_sidebar_items
 gen.__class__.generate_sidebar = generate_sidebar
@@ -360,25 +513,40 @@ for name in os.listdir(gen.dist_folder):
 	elif os.path.isdir(path):
 		shutil.rmtree(path)
 
-gen.add_all_html_templates(os.path.join(gen.gen_folder, 'templates'))
+gen.call_custom_function("generation_setup")
+
+gen.add_icon_declaration([
+	'add',
+	'home',
+	'remove',
+	'search',
+	'link_2'
+])
+
+gen.add_all_html_templates_from_path(os.path.join(gen.gen_folder, 'templates'))
 gen.add_all_class_informations(gen.src_folder)
 
 gen.call_custom_function("configure_html_templates")
 gen.call_custom_function("configure_classes")
+
+class_list_content = []
+for class_info in gen.classes:
+	href = class_info["href"]
+	class_list_content.append(f"""<li><a href="{href}">{class_info["name"]}</a></li>""")
 
 gen.add_page({
 	"name": "All classes",
 	"href": "$BASE_URL/classes/",
 	"location": "/classes",
 	"filename": gen.dist_path('classes/index.html'),
-	"content": gen.get_template('all_classes.html')
+	"content": gen.get_template('all_classes.html').replace("{{class_list}}", "".join(class_list_content))
 })
 
 sidebar_class_referece = {
 	"name": "CLASS REFERENCE",
 	"items": [{
 		"href": "$BASE_URL/classes/",
-		"name": "All Classes"
+		"name": "All classes"
 	}]
 }
 for class_info in gen.classes:
@@ -412,10 +580,11 @@ for class_info in gen.classes:
 		"items": sidebar_class_items
 	})
 
-gen.add_sidebar_item(sidebar_class_referece)
-
 gen.call_custom_function("configure_pages")
 gen.call_custom_function("configure_sidebar")
+
+# Class reference is added last, always
+gen.add_sidebar_item(sidebar_class_referece)
 
 for page in gen.pages:
 	gen.make_page(page)

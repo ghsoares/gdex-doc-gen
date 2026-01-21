@@ -3,14 +3,20 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>{{project_title}}</title>
+	<title>All classes - {{project_title}}</title>
 	{{default_header}}
 </head>
 <body>
 	{{sidebar}}
 	<div>
 		{{doc_header}}
+		<section id="all-classes">
+			<h1 link-section>All classes</h1>
+			<ul id="class-list">
+				{{class_list}}
+			</ul>
+		</section>
+		{{default_footer}}
 	</div>
-	{{default_footer}}
 </body>
 </html>

@@ -470,7 +470,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    content: "❯";
+    content: "\276f";
     font-size: inherit;
     transition: transform 100ms ease-in-out;
 }
@@ -483,8 +483,16 @@ body {
     transform: rotate(90deg);
 }
 
+.sidebar-caption.leaf {
+    font-weight: 400;
+}
+
 .sidebar-caption.leaf > a {
     width: 100%;
+}
+
+.sidebar-caption.leaf.active {
+    font-weight: 700;
 }
 
 body > div {
@@ -570,6 +578,17 @@ legend {
     font-family: var(--header-font-family);
 }
 
+#class-list {
+    padding: 0;
+}
+
+#class-list > li {
+    list-style: disc;
+    margin-left: 24px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
 #class-method-table {
     border-collapse: collapse;
     width: 100%;
@@ -610,4 +629,22 @@ legend {
 
 .method-description > p {
     margin-bottom: 12px;
+}
+
+.headerlink {
+    opacity: 0%;
+    margin-left: 8px;
+}
+
+[link-section]:hover > .headerlink {
+    opacity: 100%;
+}
+
+footer {
+    margin-top: auto;
+    color: var(--footer-color);
+}
+
+footer > p {
+    margin: 0;
 }

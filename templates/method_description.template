@@ -1,8 +1,9 @@
-<p class="method-header" id="method-{{method_name}}">
-	{{return_type}}
-	<strong>{{method_name}}</strong>({{method_params}})
-</p>
-<div class="method-description">
-	{{method_description}}
-</div>
-<hr>
+<section id="method-{{method_name}}">
+	<p class="method-header" id="method-{{method_name}}" link-section>
+		{{return_type}}
+		<strong>{{method_name}}</strong>({{method_params}}) {{method_qualifiers}}
+	</p>
+	<div class="method-description">
+		{{method_description}}
+	</div>
+</section>
