@@ -246,6 +246,7 @@ def generate_sidebar_items(gen, items, depth = 1):
 
 def generate_sidebar(gen):
 	generated = gen.get_template("sidebar")
+	generated = generated.replace("{{project_sidebar_header}}", gen.get_template('project_sidebar_header'))
 	generated = generated.replace("{{items}}", gen.generate_sidebar_items(gen.sidebar))
 	return generated
 
@@ -254,7 +255,7 @@ def generate_doc_header(gen, current_location):
 
 	items = []
 
-	items.append("""<li><a href="$BASE_URL/index.html" class="material-symbols-outlined" aria-label="Home">home</a></li>""")
+	items.append("""<li><a href="$BASE_URL/" class="material-symbols-outlined" aria-label="Home">home</a></li>""")
 
 	current_location = current_location.split("/")[1:]
 
@@ -359,14 +360,14 @@ gen.call_custom_function("configure_classes")
 
 gen.add_page({
 	"name": "All classes",
-	"href": "$BASE_URL/classes/index.html",
+	"href": "$BASE_URL/classes/",
 	"location": "/classes",
 	"filename": gen.dist_path('classes/index.html'),
 	"content": gen.get_template('all_classes.html')
 })
 
 sidebar_class_referece = {
-	"href": "$BASE_URL/classes/index.html",
+	"href": "$BASE_URL/classes/",
 	"name": "CLASS REFERENCE",
 	"items": []
 }

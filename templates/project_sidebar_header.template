@@ -1,0 +1,3 @@
+<a href="$BASE_URL/" id="sidebar-header">
+	<h2>{{project_title}}</h2>
+</a>
