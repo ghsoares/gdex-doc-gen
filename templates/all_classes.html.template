@@ -11,6 +11,6 @@
 	<div>
 		{{doc_header}}
 	</div>
-	<script src="/resources/scripts/documentation.js"></script>
+	{{default_footer}}
 </body>
 </html>

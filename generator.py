@@ -287,6 +287,7 @@ def make_page(gen, page):
 
 	page['content'] = page['content'].replace("{{project_title}}", gen.project_name)
 	page['content'] = page['content'].replace("{{default_header}}", gen.get_template("default_header"))
+	page['content'] = page['content'].replace("{{default_footer}}", gen.get_template("default_footer"))
 
 	soup = bs4.BeautifulSoup(page['content'], features="html.parser")
 	final_content = soup.prettify()
