@@ -24,10 +24,12 @@ gen.project_name = gen.args.project_name
 
 # Get absolute paths
 gen.base_url = os.getenv('PROJECT_BASE_URL', '').rstrip('/')
-gen.src_folder = os.path.abspath(gen.args.src_folder)
-gen.dst_folder = os.path.abspath(gen.args.dst_folder)
+gen.src_folder = os.path.join(os.getcwd(), gen.args.src_folder)
+gen.dst_folder = os.path.join(os.getcwd(), gen.args.dst_folder)
 gen.dist_folder = os.path.join(gen.dst_folder, 'dist')
-gen.gen_folder = os.path.abspath('.')
+gen.gen_folder = os.path.dirname(os.path.abspath(__file__))
+
+print(os.getcwd())
 
 gen.godot_docs_url = "https://docs.godotengine.org/en/stable"
 gen.templates = {}
