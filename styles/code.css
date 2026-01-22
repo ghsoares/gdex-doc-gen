@@ -1,86 +1,175 @@
-code {
-	background-color: var(--code-background-color);
-    border-radius: 4px;
+/* Syntax highlighting */
+
+/* Remove default red boxes around Pygments errors */
+.codeblocks > .language > pre > code > .err {
+    border: none;
 }
 
-code.literal {
-	color: var(--code-literal-color);
-	padding: 3px 5px;
+/* Default Pygments styles make all of these bold */
+.codeblocks > .language > pre > code > .k /* Keyword */,
+.codeblocks > .language > pre > code > .ges /* Generic.EmphStrong */,
+.codeblocks > .language > pre > code > .gh /* Generic.Heading */,
+.codeblocks > .language > pre > code > .gp /* Generic.Prompt */,
+.codeblocks > .language > pre > code > .gs /* Generic.Strong */,
+.codeblocks > .language > pre > code > .gu /* Generic.Subheading */,
+.codeblocks > .language > pre > code > .kc /* Keyword.Constant */,
+.codeblocks > .language > pre > code > .kd /* Keyword.Declaration */,
+.codeblocks > .language > pre > code > .kn /* Keyword.Namespace */,
+.codeblocks > .language > pre > code > .kr /* Keyword.Reserved */,
+.codeblocks > .language > pre > code > .nc /* Name.Class */,
+.codeblocks > .language > pre > code > .nd /* Name.Decorator */,
+.codeblocks > .language > pre > code > .ni /* Name.Entity */,
+.codeblocks > .language > pre > code > .nl /* Name.Label */,
+.codeblocks > .language > pre > code > .nn /* Name.Namespace */,
+.codeblocks > .language > pre > code > .nt /* Name.Tag */,
+.codeblocks > .language > pre > code > .ow /* Operator.Word */,
+.codeblocks > .language > pre > code > .se /* Literal.String.Escape */ {
+    font-weight: revert;
 }
 
-.codeblocks > .codeblocks-tabs {
-	display: flex;
-	flex-direction: row;
+/* Emphasized lines */
+.codeblocks > .language > pre > code > .hll {
+    background-color: var(--highlight-background-emph-color);
 }
 
-.codeblocks > .codeblocks-tabs > button {
-	padding: 0;
-	border: 0;
-	border-radius: 0;
-
-	background-color: var(--code-tabs-background-color);
-    border-top: 4px solid var(--code-tabs-selected-color);
-	color: var(--link-color);
-    padding: 0.5rem 1.25rem;
-
-	cursor: pointer;
+.codeblocks > .language > pre > code > .n /* Name */ {
+    color: var(--body-color);
 }
 
-.codeblocks > .language {
-	display: none;
-
-	padding: 0.4rem;
-	position: relative;
-
-	background-color: var(--code-tabs-background-color);
+.codeblocks > .language > pre > code > .gh /* Generic.Heading */,
+.codeblocks > .language > pre > code > .gu /* Generic.Subheading */,
+.codeblocks > .language > pre > code > .go /* Generic.Output */,
+.codeblocks > .language > pre > code > .gt /* Generic.Traceback */ {
+    color: var(--highlight-default-color);
 }
 
-.codeblocks > .language.active {
-	display: block;
+.codeblocks > .language > pre > code > .c  /* Comment */,
+.codeblocks > .language > pre > code > .c1 /* Comment.Single */,
+.codeblocks > .language > pre > code > .cm /* Comment.Multiline */,
+.codeblocks > .language > pre > code > .cs /* Comment.Special */ {
+    color: var(--highlight-comment-color);
+    /* Match the Godot editor style (no italic). */
+    font-style: normal;
 }
 
-.codeblocks > .language > .filename {
-	background-color: var(--code-tabs-background-color);
-	position: absolute;
-	right: 16px;
-	top: 16px;
-	cursor: pointer;
-	color: var(--link-color);
-	border-radius: 2px;
-
-	padding: 3px 5px;
-	border: 0;
-
-	font-family: var(--monospace-font-family);
-	font-weight: 700;
-
-	opacity: 50%;
+.codeblocks > .language > pre > code > .bp /* Name.Builtin.Pseudo */,
+.codeblocks > .language > pre > code > .k  /* Keyword */,
+.codeblocks > .language > pre > code > .kc /* Keyword.Constant */,
+.codeblocks > .language > pre > code > .kd /* Keyword.Declaration */,
+.codeblocks > .language > pre > code > .kn /* Keyword.Namespace */,
+.codeblocks > .language > pre > code > .kp /* Keyword.Pseudo */,
+.codeblocks > .language > pre > code > .kr /* Keyword.Reserved */,
+.codeblocks > .language > pre > code > .kt /* Keyword.Type */,
+.codeblocks > .language > pre > code > .ow /* Operator.Word */ {
+    color: var(--highlight-keyword-color);
 }
 
-.codeblocks > .language > .filename:hover {
-	background-color: var(--code-tabs-background-color);
-	position: absolute;
-	right: 16px;
-	top: 16px;
-	cursor: pointer;
-	color: var(--link-color);
-	border-radius: 2px;
-
-	padding: 3px 5px;
-
-	opacity: 100%;
+.codeblocks > .language > pre > code > .k-ControlFlow /* Keyword.ControlFlow */ {
+    color: var(--highlight-control-flow-keyword-color);
 }
 
-.codeblocks > .language > pre {
-	-moz-tab-size:    4;
-    -o-tab-size:      4;
-    tab-size:         4;
-
-	background-color: var(--highlight-background-color);
-	padding: 18px 16px;
-	margin: 0;
+.codeblocks > .language > pre > code > .ch /* Comment.Hashbang */,
+.codeblocks > .language > pre > code > .cp /* Comment.Preproc */ {
+    color: var(--highlight-keyword2-color);
 }
 
-.codeblocks .language > pre > code {
-	background: none;
+.codeblocks > .language > pre > code > .l  /* Literal */ {
+    color: var(--highlight-literal-color)
+}
+
+.codeblocks > .language > pre > code > .m  /* Literal.Number */,
+.codeblocks > .language > pre > code > .mf /* Literal.Number.Float */,
+.codeblocks > .language > pre > code > .mi /* Literal.Number.Integer */,
+.codeblocks > .language > pre > code > .il /* Literal.Number.Integer.Long */,
+.codeblocks > .language > pre > code > .mb /* Literal.Number.Bin */,
+.codeblocks > .language > pre > code > .mh /* Literal.Number.Hex */,
+.codeblocks > .language > pre > code > .mo /* Literal.Number.Oct */ {
+    color: var(--highlight-number-color);
+}
+
+.codeblocks > .language > pre > code > .na /* Name.Attribute */,
+.codeblocks > .language > pre > code > .nd /* Name.Decorator */,
+.codeblocks > .language > pre > code > .ni /* Name.Entity */,
+.codeblocks > .language > pre > code > .nl /* Name.Label */ {
+    color: var(--highlight-decorator-color);
+}
+
+.codeblocks > .language > pre > code > .nb /* Name.Builtin */,
+.codeblocks > .language > pre > code > .ne /* Name.Exception */ {
+    color: var(--highlight-engine-type-color);
+}
+
+.codeblocks > .language > pre > code > .nc /* Name.Class */,
+.codeblocks > .language > pre > code > .nn /* Name.Namespace */,
+.codeblocks > .language > pre > code > .no /* Name.Constant */,
+.codeblocks > .language > pre > code > .nv /* Name.Variable */,
+.codeblocks > .language > pre > code > .vc /* Name.Variable.Class */,
+.codeblocks > .language > pre > code > .vg /* Name.Variable.Global */,
+.codeblocks > .language > pre > code > .vm /* Name.Variable.Magic */ {
+    color: var(--highlight-user-type-color);
+}
+
+.codeblocks > .language > pre > code > .vi /* Name.Variable.Instance */ {
+    color: var(--highlight-member-variable-color);
+}
+
+.codeblocks > .language > pre > code > .nf /* Name.Function */,
+.codeblocks > .language > pre > code > .fm /* Name.Function.Magic */,
+.codeblocks > .language > pre > code > .nt /* Name.Tag */ {
+    color: var(--highlight-function-color);
+}
+
+.codeblocks > .language > pre > code > .o  /* Operator */,
+.codeblocks > .language > pre > code > .p  /* Punctuation */,
+.codeblocks > .language > pre > code > .si /* Literal.String.Interpol */,
+.codeblocks > .language > pre > code > .sx /* Literal.String.Other */,
+.codeblocks > .language > pre > code > .sr /* Literal.String.Regex */,
+.codeblocks > .language > pre > code > .ss /* Literal.String.Symbol */ {
+    color: var(--highlight-operator-color);
+}
+
+.codeblocks > .language > pre > code > .cpf/* Comment.PreprocFile */,
+.codeblocks > .language > pre > code > .s  /* Literal.String */,
+.codeblocks > .language > pre > code > .s1 /* Literal.String.Single */,
+.codeblocks > .language > pre > code > .s2 /* Literal.String.Double */,
+.codeblocks > .language > pre > code > .sc /* Literal.String.Char */,
+.codeblocks > .language > pre > code > .se /* Literal.String.Escape */,
+.codeblocks > .language > pre > code > .sa /* Literal.String.Affix */,
+.codeblocks > .language > pre > code > .sb /* Literal.String.Backtick */,
+.codeblocks > .language > pre > code > .dl /* Literal.String.Delimiter */,
+.codeblocks > .language > pre > code > .sd /* Literal.String.Doc */,
+.codeblocks > .language > pre > code > .sh /* Literal.String.Heredoc */ {
+    color: var(--highlight-string-color);
+}
+
+.codeblocks > .language > pre > code > .nf.nf-Declaration /* Name.Function.Declaration */ {
+	color: var(--highlight-function-declaration-color);
+}
+
+.codeblocks > .language > pre > code > .nb.nb-Type /* Name.Builtin.Type */ {
+	color: var(--highlight-base-type-color);
+}
+
+.codeblocks > .language > pre > code > .c.c-Doc /* Comment.Doc */ {
+	color: var(--highlight-doc-comment-color);
+}
+
+.codeblocks > .language > pre > code > .c.c-Region /* Comment.Region */ {
+	color: var(--highlight-region-comment-color);
+}
+
+.codeblocks > .language > pre > code > .nb.nb-Function /* Name.Builtin.Function */ {
+	color: var(--highlight-global-function-color);
+}
+
+.codeblocks > .language > pre > code > .sx /* String.Other */ {
+	color: var(--highlight-get-node-shorthand-color);
+}
+
+.codeblocks > .language > pre > code > .s.s-NodePath /* String.NodePath */ {
+	color: var(--highlight-node-path-color);
+}
+
+.codeblocks > .language > pre > code > .s.s-StringName /* String.StringName */ {
+	color: var(--highlight-string-name-color);
 }

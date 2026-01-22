@@ -29,8 +29,6 @@ gen.dst_folder = os.path.join(os.getcwd(), gen.args.dst_folder)
 gen.dist_folder = os.path.join(gen.dst_folder, 'dist')
 gen.gen_folder = os.path.dirname(os.path.abspath(__file__))
 
-print(os.getcwd())
-
 gen.godot_docs_url = "https://docs.godotengine.org/en/stable"
 gen.templates = {}
 gen.classes = []
@@ -41,6 +39,7 @@ gen.sidebar = []
 gen.icon_list = []
 gen.copyright_info = ""
 gen.build_info = """<p>Built with <a href="https://github.com/ghsoares/gdex-doc-gen">GDExDocGen</a>.</p>"""
+gen.markup_code_styles = {}
 
 def ensure_dir(gen, path):
 	if not os.path.exists(path):
@@ -156,21 +155,41 @@ def add_documentation_page(gen, page):
 def add_sidebar_item(gen, item):
 	gen.sidebar.append(item)
 
+def get_class_url(gen, cname):
+	if cname in gen.class_index:
+		return f"$BASE_URL/classes/class_{cname.lower()}.html"
+	
+	return os.path.join(gen.godot_docs_url, f"classes/class_{cname.lower()}.html")
+
 def markup_type(gen, text):
 	if text == "void":
 		return "<abbr title=\"No return value.\">void</abbr>"
-	if text in gen.class_index:
-		return f"<a href=\"$BASE_URL/classes/class_{text}.html\">{text}</a>"
 	
 	if text.startswith("Array["):
 		actual_text = text[len("Array["):text.find("]")]
 		return gen.markup_type("Array") + "[" + gen.markup_type(actual_text) + "]"
  
-	class_url = os.path.join(gen.godot_docs_url, f"classes/class_{text.lower()}.html")
+	class_url = gen.get_class_url(text)
 	return f"<a href=\"{class_url}\">{text}</a>"
+
+def markup_member(gen, text, type):
+	splitted = text.split(".")
+
+	# Member is in this page
+	if len(splitted) == 1:
+		url = f"#{type}-{splitted[0]}"
+		return f"<a href=\"{url}\">{text}</a>"
+	# Referencing other class
+	elif len(splitted) == 2:
+		class_url = gen.get_class_url(splitted[0])
+		url = f"{class_url}#{type}-{splitted[1]}"
+		return f"<a href=\"{url}\">{text}</a>"
+
+	return text
 
 def markup_codeblocks(gen, text):
 	import re
+	from codehighlight import highlight_code
 
 	generated = text
 
@@ -193,32 +212,44 @@ def markup_codeblocks(gen, text):
 		code_end = m.span()
 		code_end = (code_end[0] + code_start[1], code_end[1] + code_start[1])
 
-		code = generated[code_start[1]:code_end[0]].strip()
-		code = code.replace("<", "&lt;")
-		code = code.replace(">", "&gt;")
+		code = highlight_code(
+			generated[code_start[1]:code_end[0]].strip(), 
+			language
+		)
+		code_markup = code['markup']
+		code_style_defs = code['style_defs']
+		code_language_name = code['language_name']
+
+		if not language in gen.markup_code_styles:
+			gen.markup_code_styles[language] = code_style_defs
 
 		filename_el = f"""<button title="Click to copy the code" class="filename">{filename}</button>""" if filename else ""
 		active_class = "active" if first else ""
 
-		code = f"""<div class="language {language} {active_class}">{filename_el}<pre><code>{code}</code></pre></div>"""
+		code_markup = f"""<div class="language {language} {active_class}">{filename_el}<pre><code>{code_markup}</code></pre></div>"""
 
-		generated = generated[:code_start[0]] + code + generated[code_end[1]:]
+		generated = generated[:code_start[0]] + code_markup + generated[code_end[1]:]
 		first = False
 
-		languages.append(language)
+		languages.append([language, code_language_name])
 
 	return {
 		"languages": languages,
 		"text": generated
 	}
 
+def markup_list(gen, text):
+
+	pass
+
 def markup_bbcode(gen, text):
 	import re
 
-	generated = text
+	generated = text.strip()
+
+	generated_literal_blocks = {}
 
 	# Match codeblocks
-	generated_codeblocks = {}
 	while True:
 		block0 = re.search(r"\[codeblocks\]", generated)
 		if not block0: break
@@ -230,22 +261,52 @@ def markup_bbcode(gen, text):
 		block1 = (block1[0] + block0[1], block1[1] + block0[1])
 
 		block = gen.markup_codeblocks(generated[block0[1]:block1[0]])
-		block_id = f"codeblock-{len(generated_codeblocks)}"
+		block_id = str(len(generated_literal_blocks))
 
 		block_tabs = []
 		for lang in block['languages']:
-			block_tabs.append(f"""<button class="{lang}">{lang}</button>""")
+			block_tabs.append(f"""<button class="{lang[0]}">{lang[1]}</button>""")
 			pass
 
 		block_text = f"""<div class="codeblocks"><div class="codeblocks-tabs">{''.join(block_tabs)}</div>{block['text']}</div>"""
 
 		generated = generated[:block0[0]] + "{{" + block_id + "}}" + generated[block1[1]:]
-		generated_codeblocks[block_id] = block_text
+		generated_literal_blocks[block_id] = block_text
+	
+	# Ordered and unordered list
+	while True:
+		list0 = re.search(r"\[ol\]|\[ul\]", generated)
+		if not list0: break
+		name = list0.group(0)[1:3]
+		list0 = list0.span()
+
+		list1 = re.search(f"\\[/{name}\\]", generated[list0[1]:])
+		if not list1: break
+		list1 = list1.span()
+		list1 = (list1[0] + list0[1], list1[1] + list0[1])
+
+		list_items = generated[list0[1]:list1[0]].strip()
+
+		block_text = list_items.split("\n")
+		block_text = [gen.markup_bbcode(line) for line in block_text]
+		block_text = [f"<li>{line.strip()}</li>" for line in block_text]
+		block_text = "".join(block_text)
+		block_text = f"<{name}>{block_text}</{name}>"
+
+		block_id = str(len(generated_literal_blocks))
+
+		generated = generated[:list0[0]] + "{{" + block_id + "}}" + generated[list1[1]:]
+		generated_literal_blocks[block_id] = block_text
+
+	# Escape any character which can break HTML
+	generated = generated.replace("<", "&lt;")
+	generated = generated.replace(">", "&gt;")
 
 	# Generate paragraphs
 	generated = re.split(r"\n+", generated)
-	for i in range(len(generated)):
-		generated[i] = "<p>" + generated[i].strip() + "</p>"
+	generated = [line for line in generated if len(line.strip()) > 0]
+	if len(generated) > 1:
+		generated = ["<p>" + line + "</p>" for line in generated]
 	generated = "".join(generated)
 
 	# Basic formatting tabs
@@ -259,6 +320,10 @@ def markup_bbcode(gen, text):
 	generated = re.sub(r"\[/s\]", "</s>", generated)
 	generated = re.sub(r"\[kbd\]", "<kbd>", generated)
 	generated = re.sub(r"\[/kbd\]", "</kbd>", generated)
+	generated = re.sub(r"\[br\]", "<br>", generated)
+	generated = re.sub(r"\[/br\]", "</br>", generated)
+	generated = re.sub(r"\[h(\d)\]", r"<h\1>", generated)
+	generated = re.sub(r"\[/h(\d)\]", r"</h\1>", generated)
 
 	# Section
 	generated = re.sub(r"\[section=(.+?)\]", r"""<section id="\1">""", generated)
@@ -281,15 +346,26 @@ def markup_bbcode(gen, text):
 	generated = re.sub(r"\[code\](.+?)\[/code\]", r"""<code class="literal notranslate">\1</code>""", generated)
 	generated = re.sub(r"\[param (.+?)\]", r"""<code class="literal notranslate">\1</code>""", generated)
 
+	# Class reference
 	generated = re.sub(
 		r"\[class (.+?)\]", 
 		lambda m: gen.markup_type(m.group(1)),
 		generated
 	)
+	generated = re.sub(
+		r"\[member (.+?)\]", 
+		lambda m: gen.markup_member(m.group(1), "property"),
+		generated
+	)
+	generated = re.sub(
+		r"\[method (.+?)\]", 
+		lambda m: gen.markup_member(m.group(1), "method"),
+		generated
+	)
 
-	# Insert codeblocks back
-	for codeblock_id in generated_codeblocks.keys():
-		generated = generated.replace("{{" + codeblock_id + "}}", generated_codeblocks[codeblock_id])
+	# Insert literal blocks back
+	for block_id in generated_literal_blocks.keys():
+		generated = generated.replace("{{" + block_id + "}}", generated_literal_blocks[block_id])
 
 	return generated
 
@@ -440,6 +516,10 @@ def copy_folder(gen, src, dst, dirs_exist_ok=True):
 		dirs_exist_ok=dirs_exist_ok
 	)
 
+def make_file(gen, filename, content):
+	with open(filename, 'w+') as f:
+		f.write(content)
+
 def make_page(gen, page):
 	page['content'] = page['content'].replace("{{sidebar}}", gen.generate_sidebar())
 	page['content'] = page['content'].replace("{{doc_header}}", gen.generate_doc_header(page['location']))
@@ -482,7 +562,9 @@ gen.__class__.add_all_class_informations = add_all_class_informations
 gen.__class__.add_page = add_page
 gen.__class__.add_documentation_page = add_documentation_page
 gen.__class__.add_sidebar_item = add_sidebar_item
+gen.__class__.get_class_url = get_class_url
 gen.__class__.markup_type = markup_type
+gen.__class__.markup_member = markup_member
 gen.__class__.markup_codeblocks = markup_codeblocks
 gen.__class__.markup_bbcode = markup_bbcode
 gen.__class__.markup_qualifier = markup_qualifier
@@ -493,6 +575,7 @@ gen.__class__.generate_sidebar_items = generate_sidebar_items
 gen.__class__.generate_sidebar = generate_sidebar
 gen.__class__.generate_doc_header = generate_doc_header
 gen.__class__.copy_folder = copy_folder
+gen.__class__.make_file = make_file
 gen.__class__.make_page = make_page
 gen.__class__.call_custom_function = call_custom_function
 
