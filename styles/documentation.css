@@ -628,7 +628,6 @@ legend {
 
 .method-description {
     padding-left: 12px;
-    font-size: 110%;
 }
 
 .method-description > p {
@@ -683,6 +682,11 @@ code.literal {
     font-weight: 700;
 
 	cursor: pointer;
+}
+
+.codeblocks > .codeblocks-tabs > button:not(.active) {
+    background-color: transparent;
+    border-color: transparent;
 }
 
 .codeblocks > .language {

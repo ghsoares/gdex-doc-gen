@@ -18,3 +18,31 @@ document.querySelectorAll('.codeblocks > .language > .filename').forEach(el => {
 		});
 	});
 });
+
+// Handle codeblocks
+document.querySelectorAll('.codeblocks').forEach(el => {
+	const languageElements = el.querySelectorAll(':scope > .language');
+
+	const languageTabs = document.createElement("div");
+	const languageTabButtons = [];
+	languageTabs.classList.add("codeblocks-tabs");
+	languageElements.forEach(langEl => {
+		const languageTabButton = document.createElement("button");
+		languageTabButton.textContent = langEl.getAttribute("language-name");
+
+		languageTabButton.addEventListener('click', () => {
+			languageElements.forEach(otherTab => otherTab.classList.remove('active'));
+			languageTabButtons.forEach(otherButton => otherButton.classList.remove('active'));
+			langEl.classList.add('active');
+			languageTabButton.classList.add('active');
+		});
+
+		languageTabs.appendChild(languageTabButton);
+		languageTabButtons.push(languageTabButton);
+	});
+
+	languageElements[0].classList.add('active');
+	languageTabButtons[0].classList.add('active');
+
+	el.prepend(languageTabs);
+});

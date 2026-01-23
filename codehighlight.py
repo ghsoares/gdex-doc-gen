@@ -49,6 +49,9 @@ def create_markup(language, lexer):
 def create_and_register_markup(language, language_name, lexer):
 	register_language(language, language_name, create_markup(language, lexer))
 
+def get_supported_languages():
+	return [lang for lang in iter(registered_languages.keys()) if lang != "text"]
+
 import pygments.lexers
 
 from syntax_highlight.gdscript import GDScriptLexer
@@ -56,6 +59,7 @@ from syntax_highlight.gdscript import GDScriptLexer
 create_and_register_markup("text", "Plain Text", pygments.lexers.TextLexer)
 create_and_register_markup("html", "HTML", pygments.lexers.HtmlLexer)
 create_and_register_markup("bash", "Bash", pygments.lexers.BashLexer)
+create_and_register_markup("csharp", "C#", pygments.lexers.CSharpLexer)
 create_and_register_markup("gdscript", "GDScript", GDScriptLexer)
 
 

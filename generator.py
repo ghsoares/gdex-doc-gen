@@ -39,7 +39,6 @@ gen.sidebar = []
 gen.icon_list = []
 gen.copyright_info = ""
 gen.build_info = """<p>Built with <a href="https://github.com/ghsoares/gdex-doc-gen">GDExDocGen</a>.</p>"""
-gen.markup_code_styles = {}
 
 def ensure_dir(gen, path):
 	if not os.path.exists(path):
@@ -187,187 +186,109 @@ def markup_member(gen, text, type):
 
 	return text
 
-def markup_codeblocks(gen, text):
-	import re
-	from codehighlight import highlight_code
-
-	generated = text
-
-	languages = []
-
-	first = True
-	while True:
-		m = re.search(r"""\[(\w+?)=(.+?)\]|\[(\w+?)\]""", generated)
-		if not m: break
-
-		language = m.group(1) or m.group(3)
-		filename = m.group(2)
-
-		code_start = m.span()
-
-		m = re.search(f"""\\[/{language}\\]""", generated[code_start[1]:])
-		if not m: 
-			raise Exception(f"Couldn't find closing tag [/{language}]")
-		
-		code_end = m.span()
-		code_end = (code_end[0] + code_start[1], code_end[1] + code_start[1])
-
-		code = highlight_code(
-			generated[code_start[1]:code_end[0]].strip(), 
-			language
-		)
-		code_markup = code['markup']
-		code_style_defs = code['style_defs']
-		code_language_name = code['language_name']
-
-		if not language in gen.markup_code_styles:
-			gen.markup_code_styles[language] = code_style_defs
-
-		filename_el = f"""<button title="Click to copy the code" class="filename">{filename}</button>""" if filename else ""
-		active_class = "active" if first else ""
-
-		code_markup = f"""<div class="language {language} {active_class}">{filename_el}<pre><code>{code_markup}</code></pre></div>"""
-
-		generated = generated[:code_start[0]] + code_markup + generated[code_end[1]:]
-		first = False
-
-		languages.append([language, code_language_name])
-
-	return {
-		"languages": languages,
-		"text": generated
-	}
-
-def markup_list(gen, text):
-
-	pass
-
 def markup_bbcode(gen, text):
-	import re
+	import bbcode
+	import codehighlight
 
-	generated = text.strip()
+	parser = bbcode.Parser()
 
-	generated_literal_blocks = {}
+	def render_class_tag(tag_name, value, options, parent, content):
+		assert len(options) == 1, "'class' tag can only be called with a single value"
+		val = next(iter(options.keys()))
+		return gen.markup_type(val)
 
-	# Match codeblocks
-	while True:
-		block0 = re.search(r"\[codeblocks\]", generated)
-		if not block0: break
-		block0 = block0.span()
+	def render_member_tag(tag_name, value, options, parent, content):
+		assert len(options) == 1, "'member' tag can only be called with a single value"
+		val = next(iter(options.keys()))
+		return gen.markup_member(val, "property")
 
-		block1 = re.search(r"\[/codeblocks\]", generated[block0[1]:])
-		if not block1: break
-		block1 = block1.span()
-		block1 = (block1[0] + block0[1], block1[1] + block0[1])
+	def render_method_tag(tag_name, value, options, parent, content):
+		assert len(options) == 1, "'method' tag can only be called with a single value"
+		val = next(iter(options.keys()))
+		return gen.markup_member(val, "method")
 
-		block = gen.markup_codeblocks(generated[block0[1]:block1[0]])
-		block_id = str(len(generated_literal_blocks))
+	def render_param_tag(tag_name, value, options, parent, content):
+		assert len(options) == 1, "'param' tag can only be called with a single value"
+		val = next(iter(options.keys()))
+		return f"<code class=\"literal notranslate\">{val}</code>"
 
-		block_tabs = []
-		for lang in block['languages']:
-			block_tabs.append(f"""<button class="{lang[0]}">{lang[1]}</button>""")
-			pass
+	def render_section_tag(tag_name, value, options, parent, content):
+		assert len(options) == 1, "'section' tag can only be called with a single value"
+		val = next(iter(options.values()))
+		return f"<section id={val}>{value}</section>"
 
-		block_text = f"""<div class="codeblocks"><div class="codeblocks-tabs">{''.join(block_tabs)}</div>{block['text']}</div>"""
+	def render_img_tag(tag_name, value, options, parent, content):
+		if len(options) == 0:
+			return f"""<img src="{value}"></img>"""
+		if len(options) == 1:
+			val = next(iter(options.values()))
+			return f"""<img width={val} src="{value}"></img>"""
+		raise Exception("not implemented")
 
-		generated = generated[:block0[0]] + "{{" + block_id + "}}" + generated[block1[1]:]
-		generated_literal_blocks[block_id] = block_text
-	
-	# Ordered and unordered list
-	while True:
-		list0 = re.search(r"\[ol\]|\[ul\]", generated)
-		if not list0: break
-		name = list0.group(0)[1:3]
-		list0 = list0.span()
+	def render_list_tag(tag_name, value, options, parent, content):
+		list_type = options["list"] if (options and "list" in options) else "*"
+		css_opts = {
+			"1": "decimal",
+			"01": "decimal-leading-zero",
+			"a": "lower-alpha",
+			"A": "upper-alpha",
+			"i": "lower-roman",
+			"I": "upper-roman",
+		}
+		tag = tag_name
+		css = (
+			' style="list-style-type:%s;"' % css_opts[list_type]
+			if list_type in css_opts
+			else ""
+		)
+		return "<%s%s>%s</%s>" % (tag, css, value, tag)
 
-		list1 = re.search(f"\\[/{name}\\]", generated[list0[1]:])
-		if not list1: break
-		list1 = list1.span()
-		list1 = (list1[0] + list0[1], list1[1] + list0[1])
+	def render_list_item(name, value, options, parent, content):
+		if not parent or not parent.tag_name in ["ul", "ol"]:
+			return "[*]%s<br />" % value
 
-		list_items = generated[list0[1]:list1[0]].strip()
+		return "<li>%s</li>" % value
 
-		block_text = list_items.split("\n")
-		block_text = [gen.markup_bbcode(line) for line in block_text]
-		block_text = [f"<li>{line.strip()}</li>" for line in block_text]
-		block_text = "".join(block_text)
-		block_text = f"<{name}>{block_text}</{name}>"
+	def make_render_codeblock(language):
+		def inner(tag_name, value, options, parent, content):
+			filename = None
+			if len(options) == 1:
+				filename = next(iter(options.values()))
 
-		block_id = str(len(generated_literal_blocks))
+			code = codehighlight.highlight_code(value.strip(), language)
+			code_markup = code['markup']
+			code_language_name = code['language_name']
 
-		generated = generated[:list0[0]] + "{{" + block_id + "}}" + generated[list1[1]:]
-		generated_literal_blocks[block_id] = block_text
+			filename_el = f"""<button title="Click to copy the code" class="filename">{filename}</button>""" if filename else ""
 
-	# Escape any character which can break HTML
-	generated = generated.replace("<", "&lt;")
-	generated = generated.replace(">", "&gt;")
+			code_markup = f"""<div class="language {language}" language-name="{code_language_name}">{filename_el}<pre><code>{code_markup}</code></pre></div>"""
 
-	# Generate paragraphs
-	generated = re.split(r"\n+", generated)
-	generated = [line for line in generated if len(line.strip()) > 0]
-	if len(generated) > 1:
-		generated = ["<p>" + line + "</p>" for line in generated]
-	generated = "".join(generated)
+			return code_markup
+		return inner
+			
+	parser.add_simple_formatter('codeblocks', '<div class="codeblocks">%(value)s</div>', transform_newlines=False)
+	parser.add_simple_formatter('kbd', '<kbd>%(value)s</kbd>')
+	parser.add_simple_formatter('code', '<code class="literal notranslate">%(value)s</code>')
+	parser.add_simple_formatter('br', '<br>%(value)s</br>', standalone=True)
 
-	# Basic formatting tabs
-	generated = re.sub(r"\[b\]", "<b>", generated)
-	generated = re.sub(r"\[/b\]", "</b>", generated)
-	generated = re.sub(r"\[i\]", "<i>", generated)
-	generated = re.sub(r"\[/i\]", "</i>", generated)
-	generated = re.sub(r"\[u\]", "<u>", generated)
-	generated = re.sub(r"\[/u\]", "</u>", generated)
-	generated = re.sub(r"\[s\]", "<s>", generated)
-	generated = re.sub(r"\[/s\]", "</s>", generated)
-	generated = re.sub(r"\[kbd\]", "<kbd>", generated)
-	generated = re.sub(r"\[/kbd\]", "</kbd>", generated)
-	generated = re.sub(r"\[br\]", "<br>", generated)
-	generated = re.sub(r"\[/br\]", "</br>", generated)
-	generated = re.sub(r"\[h(\d)\]", r"<h\1>", generated)
-	generated = re.sub(r"\[/h(\d)\]", r"</h\1>", generated)
+	for i in range(0, 6):
+		parser.add_simple_formatter(f"section_title{i+1}", f"<h{i+1}>%(value)s</h{i+1}>")
+		parser.add_simple_formatter(f"h{i+1}", f"<h{i+1} link-section>%(value)s</h{i+1}>")
 
-	# Section
-	generated = re.sub(r"\[section=(.+?)\]", r"""<section id="\1">""", generated)
-	generated = re.sub(r"\[/section\]", r"""</section>""", generated)
-	generated = re.sub(r"\[section_title(\d)\](.+?)\[/section_title\d\]", r"""<h\1 link-section>\2</h1>""", generated)
+	for lang in codehighlight.get_supported_languages():
+		parser.add_formatter(f"{lang}", make_render_codeblock(lang), escape_html=False)
 
-	# Url link same as text
-	generated = re.sub(r"\[url\](.+?)\[/url\]", r"""<a class="external-link" href="\1">\1</a>""", generated)
+	parser.add_formatter("section", render_section_tag)
+	parser.add_formatter("img", render_img_tag)
+	parser.add_formatter("ul", render_list_tag, transform_newlines=False, strip=True, swallow_trailing_newline=True)
+	parser.add_formatter("ol", render_list_tag, transform_newlines=False, strip=True, swallow_trailing_newline=True)
+	parser.add_formatter("*", render_list_item, newline_closes=True, transform_newlines=False, same_tag_closes=True, strip=True)
+	parser.add_formatter("class", render_class_tag, standalone=True)
+	parser.add_formatter("member", render_member_tag, standalone=True)
+	parser.add_formatter("method", render_method_tag, standalone=True)
+	parser.add_formatter("param", render_param_tag, standalone=True)
 
-	# Url link with custom text
-	generated = re.sub(r"\[url=(.+?)\](.+?)\[/url\]", r"""<a class="external-link" href="\1">\2</a>""", generated)
-
-	# Image
-	generated = re.sub(r"\[img\](.+?)\[/img\]", r"""<img src="\1"></img>""", generated)
-
-	# Image with width
-	generated = re.sub(r"\[img=(.+?)\](.+?)\[/img\]", r"""<img width="\1" src="\2"></img>""", generated)
-
-	# Simple code formatting
-	generated = re.sub(r"\[code\](.+?)\[/code\]", r"""<code class="literal notranslate">\1</code>""", generated)
-	generated = re.sub(r"\[param (.+?)\]", r"""<code class="literal notranslate">\1</code>""", generated)
-
-	# Class reference
-	generated = re.sub(
-		r"\[class (.+?)\]", 
-		lambda m: gen.markup_type(m.group(1)),
-		generated
-	)
-	generated = re.sub(
-		r"\[member (.+?)\]", 
-		lambda m: gen.markup_member(m.group(1), "property"),
-		generated
-	)
-	generated = re.sub(
-		r"\[method (.+?)\]", 
-		lambda m: gen.markup_member(m.group(1), "method"),
-		generated
-	)
-
-	# Insert literal blocks back
-	for block_id in generated_literal_blocks.keys():
-		generated = generated.replace("{{" + block_id + "}}", generated_literal_blocks[block_id])
-
-	return generated
+	return parser.format(text)
 
 def markup_qualifier(gen, qualifier):
 	match qualifier:
@@ -565,7 +486,6 @@ gen.__class__.add_sidebar_item = add_sidebar_item
 gen.__class__.get_class_url = get_class_url
 gen.__class__.markup_type = markup_type
 gen.__class__.markup_member = markup_member
-gen.__class__.markup_codeblocks = markup_codeblocks
 gen.__class__.markup_bbcode = markup_bbcode
 gen.__class__.markup_qualifier = markup_qualifier
 gen.__class__.generate_method_params = generate_method_params
