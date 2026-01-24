@@ -167,6 +167,10 @@ def markup_type(gen, text):
 	if text.startswith("Array["):
 		actual_text = text[len("Array["):text.find("]")]
 		return gen.markup_type("Array") + "[" + gen.markup_type(actual_text) + "]"
+	
+	if text.endswith("[]"):
+		actual_text = text[:len(text) - 2]
+		return gen.markup_type(actual_text) + "[]"
  
 	class_url = gen.get_class_url(text)
 	return f"<a href=\"{class_url}\">{text}</a>"

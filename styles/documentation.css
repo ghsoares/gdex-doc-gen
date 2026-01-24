@@ -628,6 +628,7 @@ legend {
 
 .method-description {
     padding-left: 12px;
+    line-height: 1.5em;
 }
 
 .method-description > p {
