@@ -1,3 +1,7 @@
+<div class="prev-next-page">
+	{{prev_page_btn}}
+	{{next_page_btn}}
+</div>
 <footer>
 	<hr>
 	<p>

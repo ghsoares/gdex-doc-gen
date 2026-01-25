@@ -24,10 +24,11 @@ gen.project_name = gen.args.project_name
 
 # Get absolute paths
 gen.base_url = os.getenv('PROJECT_BASE_URL', '').rstrip('/')
-gen.src_folder = os.path.join(os.getcwd(), gen.args.src_folder)
-gen.dst_folder = os.path.join(os.getcwd(), gen.args.dst_folder)
+gen.src_folder = os.path.abspath(os.path.join(os.getcwd(), gen.args.src_folder))
+gen.dst_folder = os.path.abspath(os.path.join(os.getcwd(), gen.args.dst_folder))
 gen.dist_folder = os.path.join(gen.dst_folder, 'dist')
 gen.gen_folder = os.path.dirname(os.path.abspath(__file__))
+gen.favicon_path = None
 
 gen.godot_docs_url = "https://docs.godotengine.org/en/stable"
 gen.templates = {}
@@ -50,11 +51,25 @@ def dst_path(gen, path):
 def dist_path(gen, path):
 	return os.path.join(gen.dist_folder, path)
 
+def relative_path(gen, path):
+	path = path.split("/")
+	path = [loc for loc in path if loc]
+	return "/".join(path)
+
+def get_page_href(gen, location):
+	path = gen.relative_path(location)
+	if not path.endswith(".html") and not path.endswith("/"):
+		path += "/"
+	return f"$BASE_URL/{path}"
+
 def set_copyright_info(gen, info):
 	gen.copyright_info = info
 
 def set_build_info(gen, info):
 	gen.build_info = info
+
+def set_favicon_path(gen, path):
+	gen.favicon_path = path
 
 def add_icon_declaration(gen, icon_name):
 	if isinstance(icon_name, list):
@@ -120,13 +135,11 @@ def get_class_info_from_xml(gen, xml_path):
 	
 	return {
 		"name": name,
-		"location": f"/classes/class_{name.lower()}",
-		"href": f"$BASE_URL/classes/class_{name.lower()}.html",
+		"location": f"/classes/class_{name.lower()}.html",
 		"inherits": inherits,
 		"brief_description": brief_description,
 		"description": description,
-		"methods": methods,
-		"filename": gen.dist_path(f"classes/class_{name.lower()}.html")
+		"methods": methods
 	}
 
 def add_class_information(gen, xml_path):
@@ -276,8 +289,8 @@ def markup_bbcode(gen, text):
 	parser.add_simple_formatter('br', '<br>%(value)s</br>', standalone=True)
 
 	for i in range(0, 6):
-		parser.add_simple_formatter(f"section_title{i+1}", f"<h{i+1}>%(value)s</h{i+1}>")
-		parser.add_simple_formatter(f"h{i+1}", f"<h{i+1} link-section>%(value)s</h{i+1}>")
+		parser.add_simple_formatter(f"section_title{i+1}", f"<h{i+1} link-section>%(value)s</h{i+1}>")
+		parser.add_simple_formatter(f"h{i+1}", f"<h{i+1}>%(value)s</h{i+1}>")
 
 	for lang in codehighlight.get_supported_languages():
 		parser.add_formatter(f"{lang}", make_render_codeblock(lang), escape_html=False)
@@ -371,10 +384,13 @@ def generate_sidebar_items(gen, items, depth = 1):
 		item_generated = gen.get_template("sidebar_item")
 
 		item_generated = item_generated.replace("{{depth}}", str(depth))
-		if 'href' in item:
+		if 'location' in item:
+			href = gen.get_page_href(item['location'])
+			if 'hash' in item:
+				href += f"#{item['hash']}"
 			item_generated = item_generated.replace(
 				"{{content}}", 
-				f"""<a href="{item['href']}">{item['name']}</a>"""
+				f"""<a href="{href}">{item['name']}</a>"""
 			)
 		else:
 			item_generated = item_generated.replace(
@@ -424,13 +440,40 @@ def generate_doc_header(gen, current_location):
 
 		nav = f"""{page['name']}"""
 		if i < len(current_location) - 1:
-			nav = f"""<a href="{page['href']}">{nav}</a>"""
+			nav = f"""<a href="{gen.get_page_href(page['location'])}">{nav}</a>"""
 
 		items.append(f"""<li class="breadcrumb-item {active_class}">{nav}</li>""")
 
 	generated = generated.replace("{{navigation_items}}", "".join(items))
 
 	return generated
+
+def build_page_navigation(gen):
+	navigation_items = []
+	def add_nav(curr_item):
+		if 'location' in curr_item and not curr_item['location'] in navigation_items:
+			navigation_items.append(curr_item['location'])
+		if 'items' in curr_item:
+			for item in curr_item['items']:
+				add_nav(item)
+	
+	navigation_items.append("/")
+
+	for item in gen.sidebar:
+		add_nav(item)
+	for i in range(len(navigation_items)):
+		curr_location = navigation_items[i]
+		prev_location = navigation_items[i - 1] if i > 0 else None
+		next_location = navigation_items[i + 1] if i < len(navigation_items) - 1 else None
+		page = gen.page_index[curr_location]
+		page['prev_page'] = prev_location
+		page['next_page'] = next_location
+
+def copy_file(gen, src, dst):
+	dirname = os.path.dirname(dst)
+	gen.ensure_dir(dirname)
+
+	shutil.copyfile(src, dst)
 
 def copy_folder(gen, src, dst, dirs_exist_ok=True):
 	gen.ensure_dir(dst)
@@ -442,6 +485,8 @@ def copy_folder(gen, src, dst, dirs_exist_ok=True):
 	)
 
 def make_file(gen, filename, content):
+	dirname = os.path.dirname(filename)
+	gen.ensure_dir(dirname)
 	with open(filename, 'w+') as f:
 		f.write(content)
 
@@ -455,12 +500,33 @@ def make_page(gen, page):
 
 	page['content'] = page['content'].replace("{{icon_list}}", ",".join(gen.icon_list))
 
+	prev_btn = ""
+	next_btn = ""
+	if page.get('prev_page'):
+		prev_btn = f"""<a class="prev" href="{gen.get_page_href(page['prev_page'])}"><span class="material-symbols-outlined">arrow_back</span>Previous</a>"""
+	if page.get('next_page'):
+		next_btn = f"""<a class="next" href="{gen.get_page_href(page['next_page'])}">Next<span class="material-symbols-outlined">arrow_forward</span></a>"""
+
+	page['content'] = page['content'].replace("{{prev_page_btn}}", prev_btn)
+	page['content'] = page['content'].replace("{{next_page_btn}}", next_btn)
+
 	page['content'] = page['content'].replace("{{copyright_info}}", gen.copyright_info)
 	page['content'] = page['content'].replace("{{build_info}}", gen.build_info)
 
+	favicon = ""
+	if gen.favicon_path:
+		if gen.favicon_path.endswith(".svg"):
+			favicon = f"""<link rel="icon" type="image/svg+xml" href="{gen.favicon_path}"/>"""
+		if gen.favicon_path.endswith(".ico"):
+			favicon = f"""<link rel="icon" type="image/x-icon" href="{gen.favicon_path}"/>"""
+	page['content'] = page['content'].replace("{{favicon}}", favicon)
+
 	page['content'] = page['content'].replace("$BASE_URL", gen.base_url)
 
-	filename = os.path.join(gen.dist_folder, page['filename'])
+	filename = gen.relative_path(page['location'])
+	if not filename.endswith(".html"):
+		filename = os.path.join(filename, "index.html")
+	filename = gen.dist_path(filename)
 	folder = os.path.dirname(filename)
 	gen.ensure_dir(folder)
 	with open(filename, 'w+') as f:
@@ -474,8 +540,11 @@ def call_custom_function(gen, function_name):
 gen.__class__.ensure_dir = ensure_dir
 gen.__class__.dst_path = dst_path
 gen.__class__.dist_path = dist_path
+gen.__class__.relative_path = relative_path
+gen.__class__.get_page_href = get_page_href
 gen.__class__.set_copyright_info = set_copyright_info
 gen.__class__.set_build_info = set_build_info
+gen.__class__.set_favicon_path = set_favicon_path
 gen.__class__.add_icon_declaration = add_icon_declaration
 gen.__class__.get_file_str = get_file_str
 gen.__class__.add_html_template_from_path = add_html_template_from_path
@@ -498,7 +567,9 @@ gen.__class__.generate_class_html = generate_class_html
 gen.__class__.generate_sidebar_items = generate_sidebar_items
 gen.__class__.generate_sidebar = generate_sidebar
 gen.__class__.generate_doc_header = generate_doc_header
+gen.__class__.build_page_navigation = build_page_navigation
 gen.__class__.copy_folder = copy_folder
+gen.__class__.copy_file = copy_file
 gen.__class__.make_file = make_file
 gen.__class__.make_page = make_page
 gen.__class__.call_custom_function = call_custom_function
@@ -529,7 +600,9 @@ gen.add_icon_declaration([
 	'home',
 	'remove',
 	'search',
-	'link_2'
+	'link_2',
+	'arrow_back',
+	'arrow_forward',
 ])
 
 gen.add_all_html_templates_from_path(os.path.join(gen.gen_folder, 'templates'))
@@ -540,50 +613,44 @@ gen.call_custom_function("configure_classes")
 
 class_list_content = []
 for class_info in gen.classes:
-	href = class_info["href"]
+	href = gen.get_page_href(class_info['location'])
 	class_list_content.append(f"""<li><a href="{href}">{class_info["name"]}</a></li>""")
 
 gen.add_page({
 	"name": "All classes",
-	"href": "$BASE_URL/classes/",
 	"location": "/classes",
-	"filename": gen.dist_path('classes/index.html'),
 	"content": gen.get_template('all_classes.html').replace("{{class_list}}", "".join(class_list_content))
 })
 
 sidebar_class_referece = {
 	"name": "CLASS REFERENCE",
 	"items": [{
-		"href": "$BASE_URL/classes/",
+		"location": "/classes",
 		"name": "All classes"
 	}]
 }
 for class_info in gen.classes:
 	location = class_info["location"]
-	href = class_info["href"]
 	gen.add_page({
 		"name": class_info["name"],
-		"href": href,
 		"location": location,
-		"filename": class_info["filename"],
 		"content": gen.generate_class_html(class_info)
 	})
 	sidebar_class_items = [{
-		"href": f"{href}#description",
-		"location": href,
+		"location": location,
+		"hash": "description",
 		"name": "Description"
 	}, {
-		"href": f"{href}#methods",
-		"location": href,
+		"location": location,
+		"hash": "methods",
 		"name": "Methods"
 	}, {
-		"href": f"{href}#method-descriptions",
-		"location": href,
+		"location": location,
+		"hash": "method-descriptions",
 		"name": "Method Descriptions"
 	}]
 
 	sidebar_class_referece['items'].append({
-		"href": href,
 		"location": location,
 		"name": class_info['name'],
 		"items": sidebar_class_items
@@ -595,14 +662,24 @@ gen.call_custom_function("configure_sidebar")
 # Class reference is added last, always
 gen.add_sidebar_item(sidebar_class_referece)
 
+gen.build_page_navigation()
+
 for page in gen.pages:
 	gen.make_page(page)
 
-# Copy styles, fonts and scripts
-gen.copy_folder(
-	os.path.join(gen.gen_folder, 'styles'),
-	os.path.join(gen.dist_folder, 'resources/styles'),
-)
+# Make stylesheets
+for style_path in glob.glob(os.path.join(gen.gen_folder, 'styles/*.css')):
+	basename = os.path.basename(style_path)
+	with open(style_path, 'r') as f:
+		style_content = f.read()
+	style_content = style_content.replace('$BASE_URL', gen.base_url)
+	gen.make_file(
+		os.path.join(gen.dist_folder, "resources/styles", basename),
+		style_content
+	)
+
+# Copy fonts and scripts
+
 gen.copy_folder(
 	os.path.join(gen.gen_folder, 'fonts'),
 	os.path.join(gen.dist_folder, 'resources/fonts'),

@@ -22,6 +22,7 @@ document.querySelectorAll('a').forEach(el => {
 	});
 
 	// Active menu items which are active to current window href
+	console.log(el.href, "\n", window.location.href);
 	if (window.location.href != el.href) return;
 
 	let parent = el.parentElement;
